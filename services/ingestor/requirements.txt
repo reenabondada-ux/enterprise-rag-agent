@@ -1,0 +1,6 @@
+python-dotenv
+psycopg2-binary
+pgvector
+openai      # or the embedding provider you decide to use
+tqdm
+langchain   # optional; can be used later

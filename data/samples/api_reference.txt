@@ -1,0 +1,60 @@
+API Reference
+
+Base URL: http://localhost:8000 (local development)
+
+Authentication: Not yet implemented (add in production)
+
+Endpoints:
+
+1. POST /query
+Performs semantic search over the document corpus.
+
+Request Body:
+{
+  "queryText": "string",  // The search query
+  "top_k": 5              // Number of results to return (default: 5)
+}
+
+Response:
+{
+  "query": "string",      // Echo of the query text
+  "hits": [
+    {
+      "id": 123,          // Document ID
+      "title": "string",  // Document title/name
+      "distance": 0.234   // Cosine distance (lower is better)
+    }
+  ]
+}
+
+Status Codes:
+- 200: Success
+- 400: Invalid request
+- 500: Internal server error
+
+Example using curl:
+curl -X POST http://localhost:8000/query \
+  -H "Content-Type: application/json" \
+  -d '{"queryText": "How do I deploy the system?", "top_k": 3}'
+
+Example using Python:
+import requests
+
+response = requests.post(
+    "http://localhost:8000/query",
+    json={"queryText": "What is pgvector?", "top_k": 5}
+)
+results = response.json()
+
+2. GET /docs
+Interactive OpenAPI documentation (Swagger UI)
+Visit in browser to test endpoints interactively.
+
+3. GET /redoc
+Alternative API documentation (ReDoc format)
+
+Future Endpoints (Planned):
+- POST /answer: Retrieval + generation for complete RAG
+- POST /ingest: API-based document ingestion
+- GET /documents: List all indexed documents
+- DELETE /documents/{id}: Remove a document

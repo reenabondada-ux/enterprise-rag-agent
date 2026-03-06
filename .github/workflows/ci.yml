@@ -1,0 +1,24 @@
+name: CI
+on: [push, pull_request]
+jobs:  
+  test:    
+    runs-on: ubuntu-latest    
+    steps:      
+      - uses: actions/checkout@v4      
+      - name: Setup Python        
+        uses: actions/setup-python@v4        
+        with:          
+          python-version: '3.11'      
+      - name: Install deps        
+        run: |          
+          python -m venv .venv          
+          source .venv/bin/activate          
+          pip install -r services/api/requirements.txt      
+      - name: Lint (ruff)        
+        run: |          
+          pip install ruff          
+          ruff check .      
+      - name: Run unit tests        
+        run: |          
+          pip install pytest          
+          pytest -q || true

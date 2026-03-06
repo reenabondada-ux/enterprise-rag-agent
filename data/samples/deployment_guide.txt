@@ -1,0 +1,48 @@
+Deployment Guide
+
+Prerequisites:
+- Docker and Docker Compose installed
+- OpenAI API key
+- Python 3.11 or higher
+- At least 4GB RAM for local development
+
+Local Development Setup:
+
+Step 1: Clone the repository
+git clone <repository-url>
+cd enterprise-rag-agent
+
+Step 2: Configure environment
+Copy .env.example to .env and set:
+- OPENAI_API_KEY: Your OpenAI API key
+- DATABASE_URL: PostgreSQL connection string (default works for Docker Compose)
+- EMBEDDING_MODEL: text-embedding-3-small (default)
+- EMBEDDING_DIM: 1536 (default)
+
+Step 3: Start infrastructure
+cd infra
+docker compose up -d
+
+This starts PostgreSQL with pgvector and Redis.
+
+Step 4: Ingest documents
+cd services/ingestor
+pip install -r requirements.txt
+PYTHONPATH=../.. python ingest.py
+
+Step 5: Run the API
+cd back to repo root
+PYTHONPATH=. uvicorn services.api.app.main:app --reload --port 8000
+
+Step 6: Test the system
+Visit http://localhost:8000/docs for interactive API documentation.
+
+Production Considerations:
+- Use managed PostgreSQL with pgvector support
+- Configure connection pooling for database
+- Set up monitoring and alerting
+- Implement API authentication
+- Configure rate limiting
+- Use environment-specific configuration
+- Enable HTTPS/TLS
+- Set up log aggregation

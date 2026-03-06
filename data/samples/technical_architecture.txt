@@ -1,0 +1,34 @@
+Technical Architecture Documentation
+
+System Components:
+
+1. API Service (FastAPI)
+The API service exposes HTTP endpoints for querying the knowledge base. It handles incoming requests, computes embeddings for query text, performs vector similarity search against the PostgreSQL database, and returns ranked results.
+
+Key endpoints:
+- POST /query: Semantic search with configurable top-k results
+- GET /health: Service health check
+
+2. Ingestor Service
+The ingestor service processes documents and loads them into the vector database. It performs:
+- Document loading from various sources
+- Text chunking with overlap for context preservation
+- Batch embedding generation via OpenAI API
+- Database insertion with pgvector format
+
+3. Shared Libraries
+Common utilities are centralized in services/shared/:
+- config.py: Environment configuration and validation
+- embeddings.py: OpenAI embedding adapter with retry logic
+
+4. Infrastructure
+- PostgreSQL 15 with pgvector extension for vector storage
+- Redis for caching (optional, for production use)
+- Docker Compose for local orchestration
+
+Technology Stack:
+- Python 3.11+
+- FastAPI for async API development
+- psycopg2 for PostgreSQL connectivity
+- OpenAI Python SDK for embeddings
+- pgvector for efficient vector operations

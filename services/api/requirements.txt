@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+psycopg2-binary
+pgvector
+sqlalchemy
+pydantic
+python-dotenv
+openai>=1.0.0
+redis
+requests
