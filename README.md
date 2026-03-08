@@ -3,7 +3,7 @@
 Enterprise-Grade RAG Knowledge Agent — starter repo.
 
 ## Goal
-A production-minded RAG agent that ingests documents, stores embeddings in pgvector (Postgres), and exposes a query API for semantic search + grounding.
+A production-minded RAG agent that ingests documents, stores embeddings in Postgres, builds a FAISS index for vector search, and exposes a query API for semantic search + grounding.
 
 ## Quick start (local MVP)
 
@@ -25,7 +25,18 @@ A production-minded RAG agent that ingests documents, stores embeddings in pgvec
 3. Run the API server from the **repo root** with PYTHONPATH set:   
     ```bash   
     cd <project-root-directory>
-    PYTHONPATH=. uvicorn services.api.app.main:app --reload --port 8000
+    PYTHONPATH=. python -m uvicorn services.api.app.main:app --reload --port 8000
     ```
     
-    Visit `http://localhost:8000/docs` for interactive API documentation.
+        Visit `http://localhost:8000/docs` for interactive API documentation.
+
+## FAISS
+
+- FAISS index path (configurable via `.env`):
+    - `FAISS_INDEX_PATH=data/faiss/index.bin`
+- Index reload endpoint:
+    - `POST /faiss/reload`
+- Ingestor post-hook (optional):
+    - `FAISS_RELOAD_URL=http://localhost:8000/faiss/reload`
+
+The FAISS index is updated during ingestion and can be reloaded by the API on demand.

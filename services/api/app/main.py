@@ -1,16 +1,26 @@
 # services/api/app/main.py
+import logging
 import psycopg2
+from threading import Lock
 from dotenv import load_dotenv
 from psycopg2.extras import RealDictCursor
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from services.shared import embed_query_text, generate_answer
-from services.shared import DATABASE_URL
+from services.shared import DATABASE_URL, EMBEDDING_DIM, FAISS_INDEX_PATH
+from services.shared import load_or_create_index, normalize_query_vector, search_index
 from starlette.concurrency import run_in_threadpool
 
 load_dotenv()
 
+logger = logging.getLogger("enterprise_rag_api")
+if not logger.handlers:
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+
 app = FastAPI(title="Enterprise RAG Agent - API")
+
+FAISS_INDEX = None
+FAISS_INDEX_LOCK = Lock()
 
 
 class QueryRequest(BaseModel):
@@ -31,7 +41,62 @@ def startup():
         conn = psycopg2.connect(DATABASE_URL)
         conn.close()
     except Exception as exception:
-        print("DB connection failed:", exception)
+        logger.error(
+            "db_connection_failed",
+            extra={"error": str(exception)},
+        )
+
+    # Load FAISS index into memory for fast search
+    _load_faiss_index()
+
+
+def _load_faiss_index() -> None:
+    global FAISS_INDEX
+    with FAISS_INDEX_LOCK:
+        FAISS_INDEX = load_or_create_index(
+            EMBEDDING_DIM, FAISS_INDEX_PATH, DATABASE_URL
+        )
+        logger.info(
+            "faiss_index_loaded",
+            extra={"path": FAISS_INDEX_PATH},
+        )
+
+
+def _fetch_docs_by_ids(ids: list[int]) -> list[dict]:
+    if not ids:
+        return []
+    connection = psycopg2.connect(DATABASE_URL)
+    cursor = connection.cursor(cursor_factory=RealDictCursor)
+    cursor.execute("SELECT id, title, text FROM documents WHERE id = ANY(%s)", (ids,))
+    rows = cursor.fetchall()
+    cursor.close()
+    connection.close()
+    row_map = {row["id"]: row for row in rows}
+    return [row_map[i] for i in ids if i in row_map]
+
+
+def _faiss_search(query_embedding: list[float], top_k: int) -> list[dict]:
+    if FAISS_INDEX is None:
+        _load_faiss_index()
+    ids, distances = search_index(FAISS_INDEX, query_embedding, top_k)
+    # Filter out empty slots returned as -1
+    filtered = [(i, d) for i, d in zip(ids, distances) if i != -1]
+    if not filtered:
+        return []
+    filtered_ids, filtered_distances = zip(*filtered)
+    docs = _fetch_docs_by_ids(list(filtered_ids))
+    distance_map = {i: d for i, d in zip(filtered_ids, filtered_distances)}
+    for doc in docs:
+        doc["distance"] = distance_map.get(doc["id"])
+    return docs
+
+
+@app.post("/faiss/reload")
+def reload_faiss_index():
+    """Reload FAISS index from disk (for ingestion updates)."""
+    _load_faiss_index()
+    logger.info("faiss_index_reloaded", extra={"path": FAISS_INDEX_PATH})
+    return {"status": "ok", "message": "FAISS index reloaded"}
 
 
 @app.post("/query")
@@ -46,22 +111,19 @@ async def query(queryRequest: QueryRequest):
     (so you can verify the DB + table wiring).
     """
     try:
-        connection = psycopg2.connect(DATABASE_URL)
-        cursor = connection.cursor(cursor_factory=RealDictCursor)
-
         query_embedding = await run_in_threadpool(
             embed_query_text, queryRequest.queryText
         )
 
-        # Example SQL - requires pgvector extension and a vector column named embedding
-        cursor.execute(
-            "SELECT id, title, text, (embedding <-> %s::vector) as distance "
-            "FROM documents ORDER BY distance LIMIT %s",
-            (query_embedding, queryRequest.top_k),
-        )
-        rows = cursor.fetchall()
-        cursor.close()
-        connection.close()
+        query_embedding = normalize_query_vector(query_embedding)
+
+        rows = _faiss_search(query_embedding, queryRequest.top_k)
+        if not rows:
+            return {
+                "query": queryRequest.queryText,
+                "hits": [],
+                "message": "No results found in the FAISS index.",
+            }
         # convert rows to simple JSON-safe structure
         hits = []
         for r in rows:
@@ -100,18 +162,11 @@ async def answer(request: AnswerRequest):
     3) Generate answer grounded in retrieved context
     """
     try:
-        connection = psycopg2.connect(DATABASE_URL)
-        cursor = connection.cursor(cursor_factory=RealDictCursor)
-
         query_embedding = await run_in_threadpool(embed_query_text, request.queryText)
-        cursor.execute(
-            "SELECT id, title, text, (embedding <-> %s::vector) as distance "
-            "FROM documents ORDER BY distance LIMIT %s",
-            (query_embedding, request.top_k),
-        )
-        rows = cursor.fetchall()
-        cursor.close()
-        connection.close()
+
+        query_embedding = normalize_query_vector(query_embedding)
+
+        rows = _faiss_search(query_embedding, request.top_k)
 
         if not rows:
             return {

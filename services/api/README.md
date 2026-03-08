@@ -14,7 +14,14 @@ Minimal FastAPI service for Enterprise RAG Agent.
 3. Run the API server from the **repo root**:   
     ```bash   
     cd <project-root-directory>
-    PYTHONPATH=. uvicorn services.api.app.main:app --reload --port 8000
+    PYTHONPATH=. python -m uvicorn services.api.app.main:app --reload --port 8000
     ```
     
     Then visit `http://localhost:8000/docs` for interactive API docs.
+
+## FAISS
+
+- FAISS index path (configurable via `.env`):
+    - `FAISS_INDEX_PATH=data/faiss/index.bin`
+- Reload FAISS index:
+    - `POST /faiss/reload`
