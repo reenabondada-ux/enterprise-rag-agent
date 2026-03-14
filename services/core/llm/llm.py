@@ -1,4 +1,4 @@
-# services/shared/llm.py
+# services/core/llm/llm.py
 """
 LLM adapter with OpenAI chat completions as default provider.
 """
@@ -6,7 +6,7 @@ LLM adapter with OpenAI chat completions as default provider.
 import time
 from typing import Iterable
 from openai import OpenAI
-from services.shared.config import OPENAI_API_KEY, CHAT_MODEL
+from services.core.config import OPENAI_API_KEY, CHAT_MODEL
 
 _client = OpenAI(
     api_key=OPENAI_API_KEY,

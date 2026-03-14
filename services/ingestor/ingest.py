@@ -9,10 +9,10 @@ import psycopg2
 from dotenv import load_dotenv
 from pgvector.psycopg2 import register_vector
 from psycopg2.extras import RealDictCursor
-from splitters import fixed_split
-from services.shared import embed_texts
-from services.shared import DATABASE_URL, EMBEDDING_DIM, FAISS_INDEX_PATH
-from services.shared import (
+from services.ingestor.splitters import fixed_split
+from services.ingestor import embed_texts
+from services.core.config import DATABASE_URL, EMBEDDING_DIM, FAISS_INDEX_PATH
+from services.core.vector.faiss_index import (
     load_or_create_index,
     normalize_vectors,
     normalize_query_vector,

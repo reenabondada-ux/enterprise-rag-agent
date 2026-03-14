@@ -16,10 +16,11 @@ The ingestor service processes documents and loads them into the vector database
 - Batch embedding generation via OpenAI API
 - Database insertion with pgvector format
 
-3. Shared Libraries
-Common utilities are centralized in services/shared/:
+3. Core Libraries
+Common utilities are centralized in services/core/:
 - config.py: Environment configuration and validation
-- embeddings.py: OpenAI embedding adapter with retry logic
+- vector/faiss_index.py: FAISS helpers for index persistence and search
+- llm/llm.py: OpenAI chat completions wrapper
 
 4. Infrastructure
 - PostgreSQL 15 with pgvector extension for vector storage

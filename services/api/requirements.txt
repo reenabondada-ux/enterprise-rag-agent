@@ -1,11 +1,19 @@
-fastapi
-uvicorn[standard]
+python-dotenv
 psycopg2-binary
 pgvector
+openai>=1.0.0
 faiss-cpu
+fastapi
+uvicorn[standard]
+tiktoken
+tqdm
+langchain   # optional; can be used later
+sentence-transformers
+numpy
+nltk
+pypdf
+unstructured
 sqlalchemy
 pydantic
-python-dotenv
-openai>=1.0.0
 redis
 requests

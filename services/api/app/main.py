@@ -6,9 +6,14 @@ from dotenv import load_dotenv
 from psycopg2.extras import RealDictCursor
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from services.shared import embed_query_text, generate_answer
-from services.shared import DATABASE_URL, EMBEDDING_DIM, FAISS_INDEX_PATH
-from services.shared import load_or_create_index, normalize_query_vector, search_index
+from services.ingestor import embed_query_text
+from services.core.llm import generate_answer
+from services.core.config import DATABASE_URL, EMBEDDING_DIM, FAISS_INDEX_PATH
+from services.core.vector.faiss_index import (
+    load_or_create_index,
+    normalize_query_vector,
+    search_index,
+)
 from starlette.concurrency import run_in_threadpool
 
 load_dotenv()

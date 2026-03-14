@@ -1,4 +1,4 @@
-# services/shared/embeddings.py
+# services/ingestor/embedders.py
 """
 Embedding adapter with OpenAI as default provider.
 Replace with Anthropic or other provider as needed.
@@ -7,7 +7,7 @@ Replace with Anthropic or other provider as needed.
 import time
 from openai import OpenAI
 from dotenv import load_dotenv
-from services.shared.config import OPENAI_API_KEY, EMBEDDING_MODEL, EMBEDDING_DIM
+from services.core.config import OPENAI_API_KEY, EMBEDDING_MODEL, EMBEDDING_DIM
 
 load_dotenv()
 

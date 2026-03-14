@@ -2,7 +2,7 @@
 import re
 import tiktoken
 from typing import List
-from services.shared import EMBEDDING_MODEL
+from services.core.config import EMBEDDING_MODEL
 
 
 def fixed_split(text: str, chunk_size: int = 1000, overlap: int = 200) -> List[str]:

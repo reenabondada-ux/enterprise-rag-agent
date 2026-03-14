@@ -1,4 +1,4 @@
-# services/shared/config.py
+# services/core/config.py
 """
 Centralized configuration for all services.
 Loads from environment variables with sensible defaults.

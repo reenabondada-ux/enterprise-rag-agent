@@ -1,4 +1,4 @@
-# services/shared/faiss_index.py
+# services/core/vector/faiss_index.py
 """
 FAISS index helpers for vector search.
 """
