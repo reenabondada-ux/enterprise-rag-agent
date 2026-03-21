@@ -14,11 +14,15 @@ A production-minded RAG agent that ingests documents, stores embeddings in Postg
     ```
 
 2. Create/activate the **root** virtual environment and ingest sample documents:   
+    Note: As a one time activity run the following command in the .venv virtual environment before executing the ingestor.
+    ```
+    python -c "import nltk; nltk.download('punkt_tab')" 
+    ```
     ```bash   
     cd <project-root-directory>
     python -m venv .venv
     source .venv/bin/activate
-    pip install -r services/ingestor/requirements.txt
+    pip install - r services/api/requirements.txt
     PYTHONPATH=. python services/ingestor/ingest.py
     ```
 
@@ -28,8 +32,14 @@ A production-minded RAG agent that ingests documents, stores embeddings in Postg
     PYTHONPATH=. python -m uvicorn services.api.app.main:app --reload --port 8000
     ```
     
+    
         Visit `http://localhost:8000/docs` for interactive API documentation.
 
+    To debug run:
+    ```
+    PYTHONPATH=. python -m uvicorn services.api.app.main:app --reload --port 8000 --log-level debug
+    ```
+    
 ## FAISS
 
 - FAISS index path (configurable via `.env`):

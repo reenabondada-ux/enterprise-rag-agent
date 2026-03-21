@@ -1,18 +1,28 @@
 # services/ingestor/ingest.py
+import glob
 import json
 import logging
 import os
 import urllib.request
 from datetime import datetime, timezone
+from typing import Dict, List, Optional
 
 import psycopg2
 from dotenv import load_dotenv
+from langchain_community.document_loaders import (
+    PyPDFLoader,
+    TextLoader,
+    UnstructuredMarkdownLoader,
+)
 from pgvector.psycopg2 import register_vector
 from psycopg2.extras import RealDictCursor
-from services.ingestor.splitters import fixed_split
 from services.ingestor import embed_texts
-from services.core.config import DATABASE_URL, EMBEDDING_DIM, FAISS_INDEX_PATH
-from services.core.vector.faiss_index import (
+from services.ingestor.splitters import (
+    SemanticBoundarySplitter,
+    semantic_split_document,
+)
+from services.core import DATABASE_URL, EMBEDDING_DIM, FAISS_INDEX_PATH
+from services.core.vector import (
     load_or_create_index,
     normalize_vectors,
     normalize_query_vector,
@@ -72,6 +82,8 @@ if not logger.handlers:
 
 load_dotenv()
 
+SEMANTIC_SPLITTER = SemanticBoundarySplitter(use_openai_for_split=False)
+
 
 def ensure_schema():
     connection = psycopg2.connect(DATABASE_URL)
@@ -124,16 +136,72 @@ def upsert_doc(title, text, embedding):
     return doc_id
 
 
-def ingest_text_file(path, title=None):
-    """Ingest a single text file, splitting into chunks."""
-    with open(path, "r", encoding="utf-8") as file:
-        text = file.read()
-    title = title or os.path.basename(path)
-    # simple fixed splitter; replace with semantic chunker later
-    chunks = fixed_split(text, chunk_size=1000, overlap=200)
-    embeddings = normalize_vectors(embed_texts(chunks))
+def load_documents_from_directory(
+    directory: str,
+    recursive: bool = True,
+    include_patterns: Optional[List[str]] = None,
+) -> List[Dict]:
+    """
+    Load documents from a directory using LangChain loaders.
+    Returns a list of {"text": ..., "metadata": ...}.
+    """
+    patterns = include_patterns or ["**/*.pdf", "**/*.md", "**/*.txt"]
+    files: List[str] = []
+    for pattern in patterns:
+        files.extend(glob.glob(os.path.join(directory, pattern), recursive=recursive))
+
+    results: List[Dict] = []
+    for path in files:
+        ext = os.path.splitext(path)[1].lower()
+        try:
+            if ext == ".pdf":
+                loader = PyPDFLoader(path)
+            elif ext == ".md":
+                loader = UnstructuredMarkdownLoader(path)
+            else:
+                loader = TextLoader(path, encoding="utf-8")
+            docs = loader.load()
+        except Exception as exc:
+            logger.error(
+                "loader_failed",
+                extra={"file": path, "error": str(exc)},
+            )
+            if ext in {".txt", ".md"}:
+                try:
+                    with open(path, "r", encoding="utf-8") as file:
+                        text = file.read()
+                    results.append({"text": text, "metadata": {"source": path}})
+                except Exception as fallback_exc:
+                    logger.error(
+                        "loader_fallback_failed",
+                        extra={"file": path, "error": str(fallback_exc)},
+                    )
+            continue
+
+        for doc in docs:
+            meta = doc.metadata if hasattr(doc, "metadata") else {}
+            meta.setdefault("source", path)
+            text = doc.page_content if hasattr(doc, "page_content") else str(doc)
+            results.append({"text": text, "metadata": meta})
+    return results
+
+
+def ingest_document(text: str, title: str, metadata: Optional[Dict] = None) -> None:
+    metadata = metadata or {}
+    if "source" not in metadata:
+        metadata = {**metadata, "source": title}
+    chunks = semantic_split_document(
+        text,
+        metadata=metadata,
+        semantic_splitter=SEMANTIC_SPLITTER,
+        chunk_size_tokens=500,
+        chunk_overlap_tokens=100,
+        semantic_threshold_chars=3000,
+    )
+    chunk_texts = [chunk["text"] for chunk in chunks]
+    embeddings = normalize_vectors(embed_texts(chunk_texts))
     doc_ids = []
-    for i, (chunk, emb) in enumerate(zip(chunks, embeddings)):
+    for i, (chunk, emb) in enumerate(zip(chunk_texts, embeddings)):
         doc_id = upsert_doc(f"{title}_chunk_{i}", chunk, emb)
         doc_ids.append(doc_id)
     update_faiss_index(doc_ids, embeddings)
@@ -143,28 +211,47 @@ def ingest_text_file(path, title=None):
     )
 
 
-def ingest_directory(dir_path, extension=".txt"):
-    """Ingest all files with given extension from a directory."""
+# todo: remove ingest_text_file if not needed
+def ingest_text_file(path, title=None):
+    """Ingest a single text file, splitting into chunks."""
+    with open(path, "r", encoding="utf-8") as file:
+        text = file.read()
+    title = title or os.path.basename(path)
+    ingest_document(text, title, {"source": path})
+
+
+def ingest_directory(
+    dir_path: str,
+    include_patterns: Optional[List[str]] = None,
+    recursive: bool = True,
+):
+    """Ingest all supported files from a directory."""
     if not os.path.isdir(dir_path):
         raise ValueError(f"Directory not found: {dir_path}")
 
-    files = [f for f in os.listdir(dir_path) if f.endswith(extension)]
-    if not files:
-        print(f"No {extension} files found in {dir_path}")
+    docs = load_documents_from_directory(
+        dir_path,
+        include_patterns=include_patterns,
+        recursive=recursive,
+    )
+    if not docs:
+        print(f"No supported files found in {dir_path}")
         return
 
-    logger.info("ingest_started", extra={"files": len(files)})
-    for filename in files:
-        file_path = os.path.join(dir_path, filename)
+    logger.info("ingest_started", extra={"files": len(docs)})
+    for doc in docs:
         try:
-            ingest_text_file(file_path)
+            meta = doc.get("metadata", {}) or {}
+            source = meta.get("source")
+            title = os.path.basename(source) if source else "document"
+            ingest_document(doc["text"], title, meta)
         except Exception as e:
             logger.error(
                 "ingest_failed",
-                extra={"file": filename, "error": str(e)},
+                extra={"file": doc.get("metadata", {}).get("source"), "error": str(e)},
             )
 
-    logger.info("ingest_completed", extra={"files": len(files)})
+    logger.info("ingest_completed", extra={"files": len(docs)})
 
 
 def _notify_faiss_reload() -> None:
@@ -196,7 +283,7 @@ if __name__ == "__main__":
     samples_dir = os.path.join(os.path.dirname(__file__), "../../data/samples")
     if os.path.isdir(samples_dir):
         logger.info("ingest_samples", extra={"dir": samples_dir})
-        ingest_directory(samples_dir, extension=".txt")
+        ingest_directory(samples_dir)
         _notify_faiss_reload()
     else:
         logger.warning("samples_missing", extra={"dir": samples_dir})

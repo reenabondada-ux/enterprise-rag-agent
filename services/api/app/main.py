@@ -1,15 +1,16 @@
 # services/api/app/main.py
 import logging
 import psycopg2
+import faiss
 from threading import Lock
 from dotenv import load_dotenv
 from psycopg2.extras import RealDictCursor
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from services.ingestor import embed_query_text
+from services.core import DATABASE_URL, EMBEDDING_DIM, FAISS_INDEX_PATH
 from services.core.llm import generate_answer
-from services.core.config import DATABASE_URL, EMBEDDING_DIM, FAISS_INDEX_PATH
-from services.core.vector.faiss_index import (
+from services.core.vector import (
     load_or_create_index,
     normalize_query_vector,
     search_index,
@@ -76,6 +77,7 @@ def _fetch_docs_by_ids(ids: list[int]) -> list[dict]:
     rows = cursor.fetchall()
     cursor.close()
     connection.close()
+    logger.info("db_query_completed")
     row_map = {row["id"]: row for row in rows}
     return [row_map[i] for i in ids if i in row_map]
 
@@ -83,12 +85,19 @@ def _fetch_docs_by_ids(ids: list[int]) -> list[dict]:
 def _faiss_search(query_embedding: list[float], top_k: int) -> list[dict]:
     if FAISS_INDEX is None:
         _load_faiss_index()
+
+    # Limit FAISS to 2 threads to prevent CPU contention and hanging of application
+    faiss.omp_set_num_threads(2)
+    logger.info("faiss_threads_set", extra={"threads": 2})
+
     ids, distances = search_index(FAISS_INDEX, query_embedding, top_k)
     # Filter out empty slots returned as -1
     filtered = [(i, d) for i, d in zip(ids, distances) if i != -1]
     if not filtered:
+        logger.info("faiss_search_no_hits")
         return []
     filtered_ids, filtered_distances = zip(*filtered)
+    logger.info("faiss_search_hits", extra={"hits": len(filtered_ids)})
     docs = _fetch_docs_by_ids(list(filtered_ids))
     distance_map = {i: d for i, d in zip(filtered_ids, filtered_distances)}
     for doc in docs:
@@ -123,6 +132,7 @@ async def query(queryRequest: QueryRequest):
         query_embedding = normalize_query_vector(query_embedding)
 
         rows = _faiss_search(query_embedding, queryRequest.top_k)
+        logger.info("faiss_search_completed")
         if not rows:
             return {
                 "query": queryRequest.queryText,
@@ -172,6 +182,7 @@ async def answer(request: AnswerRequest):
         query_embedding = normalize_query_vector(query_embedding)
 
         rows = _faiss_search(query_embedding, request.top_k)
+        logger.info("faiss_search_completed")
 
         if not rows:
             return {
