@@ -82,7 +82,7 @@ if not logger.handlers:
 
 load_dotenv()
 
-SEMANTIC_SPLITTER = SemanticBoundarySplitter(use_openai_for_split=False)
+SEMANTIC_SPLITTER = SemanticBoundarySplitter()
 
 
 def ensure_schema():

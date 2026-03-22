@@ -29,6 +29,7 @@ A production-minded RAG agent that ingests documents, stores embeddings in Postg
 3. Run the API server from the **repo root** with PYTHONPATH set:   
     ```bash   
     cd <project-root-directory>
+    export HF_TOKEN="your_token_here"
     PYTHONPATH=. python -m uvicorn services.api.app.main:app --reload --port 8000
     ```
     

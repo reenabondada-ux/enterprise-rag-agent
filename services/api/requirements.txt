@@ -16,7 +16,6 @@ redis
 requests
 sentence-transformers
 sqlalchemy
-tiktoken
 tqdm
 unstructured
 uvicorn[standard]

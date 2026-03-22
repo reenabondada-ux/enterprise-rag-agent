@@ -2,64 +2,51 @@
 from typing import Dict, List, Optional
 
 import numpy as np
-import tiktoken
 import nltk
 from nltk.tokenize import sent_tokenize
 from sentence_transformers import SentenceTransformer
+from transformers import AutoTokenizer
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-from services.core.config import EMBEDDING_MODEL
+from services.core.config import LOCAL_EMBEDDING_MODEL_SBERT
 
 nltk.download("punkt", quiet=True)
 
+_sbert_tokenizer = None
 
-def approx_token_count(text: str, model_name: str = EMBEDDING_MODEL) -> int:
+
+def approx_token_count(text: str) -> int:
     """
-    Approximate token count. If tiktoken installed, use it; otherwise use heuristic.
+    Approximate token count using the SBERT tokenizer.
     """
-    try:
-        encoding = tiktoken.encoding_for_model(model_name)
-    except Exception:
-        encoding = tiktoken.get_encoding("cl100k_base")
-    return len(encoding.encode(text))
+    global _sbert_tokenizer
+    if _sbert_tokenizer is None:
+        _sbert_tokenizer = AutoTokenizer.from_pretrained(LOCAL_EMBEDDING_MODEL_SBERT)
+    return len(_sbert_tokenizer.encode(text))
 
 
 class SemanticBoundarySplitter:
     """
     Splits long text to semantically-cohesive segments using sentence-level embeddings.
-    By default uses a local SBERT model. Optionally uses an external embedding function.
+    Uses a local SBERT model.
     """
 
     def __init__(
         self,
-        use_openai_for_split: bool = False,
-        openai_embed_fn=None,
-        sbert_model_name: str = "all-MiniLM-L6-v2",
+        sbert_model_name: str = LOCAL_EMBEDDING_MODEL_SBERT,
         cos_threshold: float = 0.72,
         min_chunk_sentences: int = 3,
         max_chunk_sentences: int = 60,
         batch_size: int = 64,
     ):
-        self.use_openai_for_split = use_openai_for_split
-        self.openai_embed_fn = openai_embed_fn
         self.cos_threshold = cos_threshold
         self.min_chunk_sentences = min_chunk_sentences
         self.max_chunk_sentences = max_chunk_sentences
         self.batch_size = batch_size
+        self.model = SentenceTransformer(sbert_model_name)
 
-        if not use_openai_for_split:
-            self.model = SentenceTransformer(sbert_model_name)
-        else:
-            if openai_embed_fn is None:
-                raise ValueError(
-                    "If use_openai_for_split=True, provide openai_embed_fn"
-                )
-
-    # Internal method to get embeddings for sentences using either OpenAI or local SBERT
+    # Internal method to get embeddings for sentences using SBERT
     def _embed_sentences(self, sents: List[str]) -> np.ndarray:
-        if self.use_openai_for_split:
-            emb = self.openai_embed_fn(sents)
-            return np.array(emb, dtype=np.float32)
         emb = self.model.encode(
             sents,
             batch_size=self.batch_size,
@@ -119,7 +106,7 @@ class SemanticBoundarySplitter:
             else:
                 segments.append(" ".join(rem))
 
-        # Merge short segments with neighbors to avoid tiny chunks
+        # Merge short segments (less than 40 tokens) with neighbors to avoid tiny chunks
         merged = []
         for seg in segments:
             if len(merged) == 0:
@@ -160,7 +147,7 @@ def semantic_split_document(
         ]
 
     if semantic_splitter is None:
-        semantic_splitter = SemanticBoundarySplitter(use_openai_for_split=False)
+        semantic_splitter = SemanticBoundarySplitter()
 
     # LangChain splitter used for final chunk size enforcement & recursive split
     splitter = RecursiveCharacterTextSplitter(

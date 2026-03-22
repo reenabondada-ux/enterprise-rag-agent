@@ -1,76 +1,24 @@
 # services/ingestor/embedders.py
 """
-Embedding adapter with OpenAI as default provider.
-Replace with Anthropic or other provider as needed.
+Embedding adapter using a local SBERT model by default.
 """
 
-import time
-from openai import OpenAI
-from dotenv import load_dotenv
-from services.core.config import OPENAI_API_KEY, EMBEDDING_MODEL, EMBEDDING_DIM
+from sentence_transformers import SentenceTransformer
 
-load_dotenv()
+from services.core.config import LOCAL_EMBEDDING_MODEL_SBERT
 
-_client = OpenAI(
-    api_key=OPENAI_API_KEY,
-    timeout=15.0,  # request timeout
-    max_retries=2,  # SDK-level retries
-)
+_model = SentenceTransformer(LOCAL_EMBEDDING_MODEL_SBERT)
 
 
 def embed_query_text(text: str) -> list[float]:
-    if not OPENAI_API_KEY:
-        raise RuntimeError("OPENAI_API_KEY is missing")
-
-    # app-level retries (for transient failures)
-    last_exception = None
-    for attempt in range(3):
-        try:
-            response = _client.embeddings.create(
-                model=EMBEDDING_MODEL,
-                input=[text],
-            )
-            vector = response.data[0].embedding
-            if len(vector) != EMBEDDING_DIM:
-                raise ValueError(
-                    "Embedding dimension mismatch: "
-                    f"got {len(vector)}, expected {EMBEDDING_DIM}"
-                )
-            return vector
-        except Exception as exception:
-            last_exception = exception
-            if attempt < 2:
-                time.sleep(0.5 * (2**attempt))  # 0.5s, 1.0s
-    raise RuntimeError(f"Embedding generation failed: {last_exception}")
+    vector = _model.encode(text, convert_to_numpy=True)
+    return vector.tolist()
 
 
 def embed_texts(texts: list[str]) -> list[list[float]]:
     """
     Batch embedding function for multiple texts.
-    Returns list[list[float]] with dimension EMBEDDING_DIM.
-    Raises RuntimeError if API call fails.
+    Returns list[list[float]] with the SBERT embedding dimension.
     """
-    if not OPENAI_API_KEY:
-        raise RuntimeError("OPENAI_API_KEY is missing")
-
-    # app-level retries (for transient failures)
-    last_exception = None
-    for attempt in range(3):
-        try:
-            response = _client.embeddings.create(
-                model=EMBEDDING_MODEL,
-                input=texts,
-            )
-            vectors = [r.embedding for r in response.data]
-            for i, vector in enumerate(vectors):
-                if len(vector) != EMBEDDING_DIM:
-                    raise ValueError(
-                        "Embedding dimension mismatch for text "
-                        f"{i}: got {len(vector)}, expected {EMBEDDING_DIM}"
-                    )
-            return vectors
-        except Exception as exception:
-            last_exception = exception
-            if attempt < 2:
-                time.sleep(0.5 * (2**attempt))  # 0.5s, 1.0s
-    raise RuntimeError(f"Batch embedding generation failed: {last_exception}")
+    vectors = _model.encode(texts, convert_to_numpy=True)
+    return vectors.tolist()
