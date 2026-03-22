@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 from psycopg2.extras import RealDictCursor
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+
 from services.ingestor import embed_query_text
 from services.core import DATABASE_URL, EMBEDDING_DIM, FAISS_INDEX_PATH
 from services.core.llm import generate_answer

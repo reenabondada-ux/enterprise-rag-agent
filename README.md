@@ -16,7 +16,7 @@ A production-minded RAG agent that ingests documents, stores embeddings in Postg
 2. Create/activate the **root** virtual environment and ingest sample documents:   
     Note: As a one time activity run the following command in the .venv virtual environment before executing the ingestor.
     ```
-    python -c "import nltk; nltk.download('punkt_tab')" 
+    python -c "import nltk; nltk.download('punkt_tab')"
     ```
     ```bash   
     cd <project-root-directory>
@@ -40,6 +40,21 @@ A production-minded RAG agent that ingests documents, stores embeddings in Postg
     ```
     PYTHONPATH=. python -m uvicorn services.api.app.main:app --reload --port 8000 --log-level debug
     ```
+
+## Chat provider selection
+
+Default provider is **Ollama**. You can override at runtime:
+
+```bash
+CHAT_PROVIDER=openai PYTHONPATH=. python -m uvicorn services.api.app.main:app --reload --port 8000
+```
+
+Environment variables:
+
+- `CHAT_PROVIDER` (default: `ollama`)
+- `OPENAI_CHAT_MODEL` (default: `gpt-4o-mini`)
+- `OLLAMA_CHAT_MODEL` (default: `llama3.1:8b`)
+- `OLLAMA_BASE_URL` (default: `http://localhost:11434`)
     
 ## FAISS
 

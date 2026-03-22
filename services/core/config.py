@@ -23,7 +23,16 @@ EMBEDDING_DIM = int(os.getenv("EMBEDDING_DIM", "384"))
 LOCAL_EMBEDDING_MODEL_SBERT = os.getenv(
     "LOCAL_EMBEDDING_MODEL_SBERT", "all-MiniLM-L6-v2"
 )
-CHAT_MODEL = os.getenv("CHAT_MODEL", "gpt-4o-mini")
+
+# Chat provider + models
+CHAT_PROVIDER = os.getenv("CHAT_PROVIDER", "ollama")
+OPENAI_CHAT_MODEL = os.getenv("OPENAI_CHAT_MODEL", "gpt-4o-mini")
+OLLAMA_CHAT_MODEL = os.getenv("OLLAMA_CHAT_MODEL", "llama3.1:8b")
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+CHAT_MODEL = os.getenv(
+    "CHAT_MODEL",
+    OPENAI_CHAT_MODEL if CHAT_PROVIDER == "openai" else OLLAMA_CHAT_MODEL,
+)
 
 # FAISS index
 FAISS_INDEX_PATH = os.getenv("FAISS_INDEX_PATH", "data/faiss/index.bin")
