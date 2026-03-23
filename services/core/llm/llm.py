@@ -1,57 +1,19 @@
 # services/core/llm/llm.py
 """
-LLM adapter supporting OpenAI or Ollama.
+LLM adapter for Ollama chat.
 """
 
 import time
 from typing import Iterable
 
 import requests
-from openai import OpenAI
 
-from services.core.config import (
-    CHAT_MODEL,
-    CHAT_PROVIDER,
-    OLLAMA_BASE_URL,
-    OPENAI_API_KEY,
-)
+from services.core.config import CHAT_MODEL, OLLAMA_BASE_URL
 
 SYSTEM_PROMPT = (
     "You are an enterprise assistant. Answer using only the provided context. "
     "If the answer is not in the context, say you do not know. Be concise."
 )
-
-
-def _openai_client() -> OpenAI:
-    if not OPENAI_API_KEY:
-        raise RuntimeError("OPENAI_API_KEY is missing")
-    return OpenAI(
-        api_key=OPENAI_API_KEY,
-        timeout=20.0,
-        max_retries=2,
-    )
-
-
-def _generate_openai_answer(
-    question: str,
-    context_text: str,
-    max_tokens: int,
-    temperature: float,
-) -> str:
-    client = _openai_client()
-    response = client.chat.completions.create(
-        model=CHAT_MODEL,
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {
-                "role": "user",
-                "content": f"Question:\n{question}\n\nContext:\n{context_text}",
-            },
-        ],
-        temperature=temperature,
-        max_tokens=max_tokens,
-    )
-    return response.choices[0].message.content.strip()
 
 
 def _generate_ollama_answer(
@@ -96,10 +58,6 @@ def generate_answer(
     last_exception = None
     for attempt in range(3):
         try:
-            if CHAT_PROVIDER == "openai":
-                return _generate_openai_answer(
-                    question, context_text, max_tokens, temperature
-                )
             return _generate_ollama_answer(
                 question, context_text, max_tokens, temperature
             )

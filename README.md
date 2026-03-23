@@ -22,7 +22,7 @@ A production-minded RAG agent that ingests documents, stores embeddings in Postg
     cd <project-root-directory>
     python -m venv .venv
     source .venv/bin/activate
-    pip install - r services/api/requirements.txt
+    pip install -r services/api/requirements.txt
     PYTHONPATH=. python services/ingestor/ingest.py
     ```
 
@@ -41,18 +41,10 @@ A production-minded RAG agent that ingests documents, stores embeddings in Postg
     PYTHONPATH=. python -m uvicorn services.api.app.main:app --reload --port 8000 --log-level debug
     ```
 
-## Chat provider selection
-
-Default provider is **Ollama**. You can override at runtime:
-
-```bash
-CHAT_PROVIDER=openai PYTHONPATH=. python -m uvicorn services.api.app.main:app --reload --port 8000
-```
+## Chat model (Ollama)
 
 Environment variables:
 
-- `CHAT_PROVIDER` (default: `ollama`)
-- `OPENAI_CHAT_MODEL` (default: `gpt-4o-mini`)
 - `OLLAMA_CHAT_MODEL` (default: `llama3.1:8b`)
 - `OLLAMA_BASE_URL` (default: `http://localhost:11434`)
     

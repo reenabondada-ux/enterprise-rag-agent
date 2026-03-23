@@ -6,7 +6,6 @@ langchain-text-splitters
 markdown
 nltk
 numpy
-openai>=1.0.0
 pgvector
 psycopg2-binary
 pydantic

@@ -4,7 +4,7 @@ The Enterprise RAG Agent is a production-grade knowledge system designed for lar
 
 Key Features:
 - Vector-based semantic search using pgvector for PostgreSQL
-- OpenAI embeddings with text-embedding-3-small model
+- Local SBERT embeddings with all-MiniLM-L6-v2
 - Automatic document chunking with configurable overlap
 - FastAPI-based REST API for easy integration
 - Docker Compose infrastructure for local development

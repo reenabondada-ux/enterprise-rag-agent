@@ -5,8 +5,8 @@ Common Issues and Solutions:
 Issue: "extension 'vector' is not available"
 Solution: The pgvector extension is not installed on your PostgreSQL server. If using Docker, ensure you're using the ankane/pgvector image or postgres image with pgvector installed. For local Postgres, install via package manager (brew install pgvector on macOS).
 
-Issue: "OPENAI_API_KEY is missing"
-Solution: Set the OPENAI_API_KEY environment variable in your .env file or export it in your shell. The embedding functions require a valid OpenAI API key to generate embeddings.
+Issue: "Model not found" from Ollama
+Solution: Pull the model with `ollama pull llama3.1:8b` (or set OLLAMA_CHAT_MODEL to an existing model from `ollama list`).
 
 Issue: "ModuleNotFoundError: No module named 'services'"
 Solution: Run commands from the repository root with PYTHONPATH=. to ensure Python can find the services package. Example: PYTHONPATH=. python services/ingestor/ingest.py
@@ -18,11 +18,10 @@ Issue: Database connection timeout
 Solution: Ensure PostgreSQL is running (docker compose ps) and the DATABASE_URL in your .env matches your database configuration. Check firewall rules if connecting to remote database.
 
 Issue: Slow embedding generation
-Solution: Embeddings are generated via OpenAI API calls which can be slow. For production, consider:
-- Caching embeddings in Redis
-- Batching embedding requests
-- Using a faster embedding model
-- Pre-computing embeddings offline
+Solution: SBERT embeddings can be slow on CPU for large corpora. For production, consider:
+- Batch embeddings
+- Use a smaller local embedding model
+- Pre-compute embeddings offline
 
 Issue: Poor retrieval quality
 Solution: Retrieval quality depends on several factors:

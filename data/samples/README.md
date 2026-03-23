@@ -20,9 +20,9 @@ PYTHONPATH=. python services/ingestor/ingest.py
 ```
 
 The ingestor will automatically:
-1. Find all .txt files in this directory
-2. Split them into 1000-character chunks with 200-character overlap
-3. Generate embeddings using OpenAI
+1. Find all supported files in this directory
+2. Split them into semantic chunks
+3. Generate embeddings using local SBERT
 4. Store them in the PostgreSQL database with pgvector
 
 ## Adding Your Own Documents

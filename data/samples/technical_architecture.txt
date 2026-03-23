@@ -13,14 +13,14 @@ Key endpoints:
 The ingestor service processes documents and loads them into the vector database. It performs:
 - Document loading from various sources
 - Text chunking with overlap for context preservation
-- Batch embedding generation via OpenAI API
+- Batch embedding generation via local SBERT
 - Database insertion with pgvector format
 
 3. Core Libraries
 Common utilities are centralized in services/core/:
 - config.py: Environment configuration and validation
 - vector/faiss_index.py: FAISS helpers for index persistence and search
-- llm/llm.py: OpenAI chat completions wrapper
+- llm/llm.py: Ollama chat wrapper
 
 4. Infrastructure
 - PostgreSQL 15 with pgvector extension for vector storage
@@ -31,5 +31,5 @@ Technology Stack:
 - Python 3.11+
 - FastAPI for async API development
 - psycopg2 for PostgreSQL connectivity
-- OpenAI Python SDK for embeddings
+- Sentence Transformers for embeddings
 - pgvector for efficient vector operations

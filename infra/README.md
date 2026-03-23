@@ -9,6 +9,8 @@
 - `ollama serve`
 - Or run a model (starts server implicitly): `ollama run llama3.1:8b`
 - If necessary pull the required model: `ollama pull llama3.1:8b`
+- To check if ollama is running: `lsof -i :11434`
+- Command to check if llama3.1:8b is available: `ollama list`
 
 ### Environment
 - `OLLAMA_BASE_URL` (default: `http://localhost:11434`)
