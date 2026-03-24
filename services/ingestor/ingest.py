@@ -238,10 +238,11 @@ def ingest_document(text: str, title: str, metadata: Optional[Dict] = None) -> N
             doc_ids.append(doc_id)
             new_embeddings.append(emb)
     update_faiss_index(doc_ids, new_embeddings)
-    logger.info(
-        "file_ingested",
-        extra={"title": title, "chunks": len(chunks)},
-    )
+    if doc_ids:
+        logger.info(
+            "file_ingested",
+            extra={"title": title, "chunks": len(chunks)},
+        )
 
 
 def ingest_directory(
