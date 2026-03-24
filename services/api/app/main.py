@@ -16,6 +16,7 @@ from services.core.vector import (
     normalize_query_vector,
     search_index,
 )
+from services.core.reranker import rerank_rows
 from starlette.concurrency import run_in_threadpool
 
 load_dotenv()
@@ -134,6 +135,9 @@ async def query(queryRequest: QueryRequest):
 
         rows = _faiss_search(query_embedding, queryRequest.top_k)
         logger.info("faiss_search_completed")
+        rows = await run_in_threadpool(
+            rerank_rows, queryRequest.queryText, rows, queryRequest.top_k
+        )
         if not rows:
             return {
                 "query": queryRequest.queryText,
@@ -184,6 +188,9 @@ async def answer(request: AnswerRequest):
 
         rows = _faiss_search(query_embedding, request.top_k)
         logger.info("faiss_search_completed")
+        rows = await run_in_threadpool(
+            rerank_rows, request.queryText, rows, request.top_k
+        )
 
         if not rows:
             return {

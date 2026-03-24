@@ -10,6 +10,9 @@ from .config import (
     OLLAMA_CHAT_MODEL,
     OLLAMA_BASE_URL,
     FAISS_INDEX_PATH,
+    RERANKER_ENABLED,
+    RERANKER_MODEL,
+    RERANKER_TOP_K,
 )
 
 __all__ = [
@@ -23,4 +26,7 @@ __all__ = [
     "OLLAMA_CHAT_MODEL",
     "OLLAMA_BASE_URL",
     "FAISS_INDEX_PATH",
+    "RERANKER_ENABLED",
+    "RERANKER_MODEL",
+    "RERANKER_TOP_K",
 ]

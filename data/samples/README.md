@@ -22,8 +22,12 @@ PYTHONPATH=. python services/ingestor/ingest.py
 The ingestor will automatically:
 1. Find all .txt files in this directory
 2. Split them into 1000-character chunks with 200-character overlap
-3. Generate embeddings using OpenAI
+3. Generate embeddings using the local SBERT model
 4. Store them in the PostgreSQL database with pgvector
+
+Optional reranking:
+- The API can rerank retrieved chunks using a cross-encoder when enabled via
+	`RERANKER_ENABLED=true` and `RERANKER_MODEL=BAAI/bge-reranker-base`.
 
 ## Adding Your Own Documents
 

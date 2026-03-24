@@ -36,3 +36,13 @@ CHAT_MODEL = os.getenv(
 
 # FAISS index
 FAISS_INDEX_PATH = os.getenv("FAISS_INDEX_PATH", "data/faiss/index.bin")
+
+# Reranker (optional)
+RERANKER_ENABLED = os.getenv("RERANKER_ENABLED", "false").lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
+RERANKER_MODEL = os.getenv("RERANKER_MODEL", "BAAI/bge-reranker-base")
+RERANKER_TOP_K = int(os.getenv("RERANKER_TOP_K", "5"))

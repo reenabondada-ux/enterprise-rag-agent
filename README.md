@@ -66,3 +66,20 @@ Environment variables:
     - `FAISS_RELOAD_URL=http://localhost:8000/faiss/reload`
 
 The FAISS index is updated during ingestion and can be reloaded by the API on demand.
+
+## Optional reranker (cross-encoder)
+
+You can enable an optional reranker to re-order retrieved chunks before building context.
+
+Environment variables:
+
+- `RERANKER_ENABLED` (default: `false`)
+- `RERANKER_MODEL` (default: `BAAI/bge-reranker-base`)
+- `RERANKER_TOP_K` (default: `5`)
+
+Example:
+
+```bash
+RERANKER_ENABLED=true RERANKER_MODEL=BAAI/bge-reranker-base RERANKER_TOP_K=5 \
+PYTHONPATH=. python -m uvicorn services.api.app.main:app --reload --port 8000
+```

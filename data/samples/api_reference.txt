@@ -53,8 +53,35 @@ Visit in browser to test endpoints interactively.
 3. GET /redoc
 Alternative API documentation (ReDoc format)
 
+4. POST /answer
+Retrieval + generation endpoint. Optionally reranks retrieved chunks when enabled.
+
+Request Body:
+{
+  "queryText": "string",
+  "top_k": 5,
+  "max_context_chars": 4000
+}
+
+Response:
+{
+  "query": "string",
+  "answer": "string",
+  "sources": [
+    {
+      "id": 123,
+      "title": "string",
+      "distance": 0.234
+    }
+  ]
+}
+
+Reranker settings (optional):
+- RERANKER_ENABLED=true
+- RERANKER_MODEL=BAAI/bge-reranker-base
+- RERANKER_TOP_K=5
+
 Future Endpoints (Planned):
-- POST /answer: Retrieval + generation for complete RAG
 - POST /ingest: API-based document ingestion
 - GET /documents: List all indexed documents
 - DELETE /documents/{id}: Remove a document
