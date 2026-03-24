@@ -1,11 +1,12 @@
 # services/ingestor/ingest.py
 import glob
+import hashlib
 import json
 import logging
 import os
 import urllib.request
 from datetime import datetime, timezone
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import psycopg2
 from dotenv import load_dotenv
@@ -99,9 +100,14 @@ def ensure_schema():
             id SERIAL PRIMARY KEY,        
             title TEXT,        
             text TEXT,        
-            embedding vector({EMBEDDING_DIM})    
+            embedding vector({EMBEDDING_DIM}),
+            content_hash TEXT NOT NULL
         );
         """
+    )
+    cursor.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS documents_content_hash_idx "
+        "ON documents (content_hash);"
     )
 
     connection.commit()
@@ -118,22 +124,39 @@ def update_faiss_index(doc_ids, embeddings) -> None:
     save_index(index, FAISS_INDEX_PATH)
 
 
-def upsert_doc(title, text, embedding):
+def upsert_doc(title, text, embedding, content_hash) -> Tuple[int, bool]:
     connection = psycopg2.connect(DATABASE_URL)
     register_vector(connection)
     cursor = connection.cursor(cursor_factory=RealDictCursor)
     cursor.execute(
         (
-            "INSERT INTO documents (title, text, embedding) "
-            "VALUES (%s, %s, %s) RETURNING id"
+            "INSERT INTO documents (title, text, embedding, content_hash) "
+            "VALUES (%s, %s, %s, %s) "
+            "ON CONFLICT (content_hash) DO NOTHING "
+            "RETURNING id"
         ),
-        (title, text, embedding),
+        (title, text, embedding, content_hash),
     )
-    doc_id = cursor.fetchone()["id"]
+    row = cursor.fetchone()
+    if row:
+        doc_id = row["id"]
+        inserted = True
+    else:
+        cursor.execute(
+            "SELECT id FROM documents WHERE content_hash = %s",
+            (content_hash,),
+        )
+        doc_id = cursor.fetchone()["id"]
+        inserted = False
     connection.commit()
     cursor.close()
     connection.close()
-    return doc_id
+    return doc_id, inserted
+
+
+def compute_content_hash(source: str, chunk_text: str, chunk_index: int) -> str:
+    hash_input = f"{source}|{chunk_index}|{chunk_text}".encode("utf-8")
+    return hashlib.sha256(hash_input).hexdigest()
 
 
 def load_documents_from_directory(
@@ -190,6 +213,7 @@ def ingest_document(text: str, title: str, metadata: Optional[Dict] = None) -> N
     metadata = metadata or {}
     if "source" not in metadata:
         metadata = {**metadata, "source": title}
+    source = metadata.get("source", title)
     chunks = semantic_split_document(
         text,
         metadata=metadata,
@@ -201,23 +225,23 @@ def ingest_document(text: str, title: str, metadata: Optional[Dict] = None) -> N
     chunk_texts = [chunk["text"] for chunk in chunks]
     embeddings = normalize_vectors(embed_texts(chunk_texts))
     doc_ids = []
+    new_embeddings = []
     for i, (chunk, emb) in enumerate(zip(chunk_texts, embeddings)):
-        doc_id = upsert_doc(f"{title}_chunk_{i}", chunk, emb)
-        doc_ids.append(doc_id)
-    update_faiss_index(doc_ids, embeddings)
+        content_hash = compute_content_hash(source, chunk, i)
+        doc_id, inserted = upsert_doc(
+            f"{title}_chunk_{i}",
+            chunk,
+            emb,
+            content_hash,
+        )
+        if inserted:
+            doc_ids.append(doc_id)
+            new_embeddings.append(emb)
+    update_faiss_index(doc_ids, new_embeddings)
     logger.info(
         "file_ingested",
         extra={"title": title, "chunks": len(chunks)},
     )
-
-
-# todo: remove ingest_text_file if not needed
-def ingest_text_file(path, title=None):
-    """Ingest a single text file, splitting into chunks."""
-    with open(path, "r", encoding="utf-8") as file:
-        text = file.read()
-    title = title or os.path.basename(path)
-    ingest_document(text, title, {"source": path})
 
 
 def ingest_directory(
@@ -293,7 +317,14 @@ if __name__ == "__main__":
             "flow."
         )
         sample_embedding = normalize_query_vector(embed_texts([sample_text])[0])
-        doc_id = upsert_doc("Sample doc", sample_text, sample_embedding)
-        update_faiss_index([doc_id], [sample_embedding])
+        content_hash = compute_content_hash("Sample doc", sample_text, 0)
+        doc_id, inserted = upsert_doc(
+            "Sample doc",
+            sample_text,
+            sample_embedding,
+            content_hash,
+        )
+        if inserted:
+            update_faiss_index([doc_id], [sample_embedding])
         logger.info("sample_doc_inserted")
         _notify_faiss_reload()
