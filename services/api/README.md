@@ -8,7 +8,7 @@ Minimal FastAPI service for Enterprise RAG Agent.
 2. Install deps:   
     ```bash   
     cd <project-root-directory>/services/api   
-    pip install -r requirements.txt
+    python -m pip install -r requirements.txt
     ```
 
 3. Run the API server from the **repo root**:   

@@ -22,7 +22,7 @@ A production-minded RAG agent that ingests documents, stores embeddings in Postg
     cd <project-root-directory>
     python -m venv .venv
     source .venv/bin/activate
-    pip install - r services/api/requirements.txt
+    python -m pip install -r services/api/requirements.txt
     PYTHONPATH=. python services/ingestor/ingest.py
     ```
 
