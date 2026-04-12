@@ -10,7 +10,7 @@ A production-minded RAG agent that ingests documents, stores embeddings in Postg
 1. Start local infra (Postgres + Redis) from the **infra** folder:   
     ```bash   
     cd <project-root-directory>/infra
-    docker compose up -d
+    docker compose --env-file ../.env up -d
     ```
 
 2. Create/activate the **root** virtual environment and ingest sample documents:   

@@ -1,6 +1,6 @@
 # services.core.llm package
-from .llm import generate_answer
+from .llm import generate_llm_answer
 
 __all__ = [
-    "generate_answer",
+    "generate_llm_answer",
 ]

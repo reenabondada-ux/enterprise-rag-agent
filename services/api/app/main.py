@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 from services.ingestor import embed_query_text
 from services.core import DATABASE_URL, EMBEDDING_DIM, FAISS_INDEX_PATH
-from services.core.llm import generate_answer
+from services.core.llm import generate_llm_answer
 from services.core.vector import (
     load_or_create_index,
     normalize_query_vector,
@@ -18,6 +18,7 @@ from services.core.vector import (
 )
 from services.core.reranker import rerank_rows
 from starlette.concurrency import run_in_threadpool
+from services.api.app.response_enricher import enrich_answer
 
 load_dotenv()
 
@@ -92,18 +93,18 @@ def _faiss_search(query_embedding: list[float], top_k: int) -> list[dict]:
     faiss.omp_set_num_threads(2)
     logger.info("faiss_threads_set", extra={"threads": 2})
 
-    ids, distances = search_index(FAISS_INDEX, query_embedding, top_k)
+    ids, scores = search_index(FAISS_INDEX, query_embedding, top_k)
     # Filter out empty slots returned as -1
-    filtered = [(i, d) for i, d in zip(ids, distances) if i != -1]
+    filtered = [(i, s) for i, s in zip(ids, scores) if i != -1]
     if not filtered:
         logger.info("faiss_search_no_hits")
         return []
-    filtered_ids, filtered_distances = zip(*filtered)
+    filtered_ids, filtered_scores = zip(*filtered)
     logger.info("faiss_search_hits", extra={"hits": len(filtered_ids)})
     docs = _fetch_docs_by_ids(list(filtered_ids))
-    distance_map = {i: d for i, d in zip(filtered_ids, filtered_distances)}
+    similarity_map = {i: s for i, s in zip(filtered_ids, filtered_scores)}
     for doc in docs:
-        doc["distance"] = distance_map.get(doc["id"])
+        doc["similarity"] = similarity_map.get(doc["id"])
     return docs
 
 
@@ -123,7 +124,7 @@ async def query(queryRequest: QueryRequest):
         * compute embedding for queryRequest.queryText
         * query documents using pgvector similarity operator (<->)
         * optionally re-rank with cross-encoder or LLM
-    For now, returns top-k documents by distance using a placeholder vector
+    For now, returns top-k documents by similarity using a placeholder vector
     (so you can verify the DB + table wiring).
     """
     try:
@@ -151,8 +152,8 @@ async def query(queryRequest: QueryRequest):
                 {
                     "id": r["id"],
                     "title": r["title"],
-                    "distance": (
-                        float(r["distance"]) if r["distance"] is not None else None
+                    "similarity": (
+                        float(r["similarity"]) if r["similarity"] is not None else None
                     ),
                 }
             )
@@ -173,50 +174,79 @@ def _build_context(rows, max_chars: int) -> list[str]:
     return context_chunks
 
 
-@app.post("/answer")
-async def answer(request: AnswerRequest):
-    """
-    Retrieval + generation endpoint.
-    1) Embed query
-    2) Retrieve top-k chunks from pgvector
-    3) Generate answer grounded in retrieved context
-    """
+async def generate_answer(
+    queryText: str,
+    top_k: int,
+    max_context_chars: int,
+) -> dict:
     try:
-        query_embedding = await run_in_threadpool(embed_query_text, request.queryText)
+        query_embedding = await run_in_threadpool(embed_query_text, queryText)
 
         query_embedding = normalize_query_vector(query_embedding)
 
-        rows = _faiss_search(query_embedding, request.top_k)
+        rows = _faiss_search(query_embedding, top_k)
         logger.info("faiss_search_completed")
-        rows = await run_in_threadpool(
-            rerank_rows, request.queryText, rows, request.top_k
-        )
+        rows = await run_in_threadpool(rerank_rows, queryText, rows, top_k)
 
         if not rows:
             return {
-                "query": request.queryText,
+                "query": queryText,
                 "answer": "I do not know based on the provided context.",
                 "sources": [],
             }
 
-        context_chunks = _build_context(rows, request.max_context_chars)
+        context_chunks = _build_context(rows, max_context_chars)
         answer_text = await run_in_threadpool(
-            generate_answer, request.queryText, context_chunks
+            generate_llm_answer, queryText, context_chunks
         )
 
         sources = [
             {
                 "id": r["id"],
                 "title": r["title"],
-                "distance": float(r["distance"]) if r["distance"] is not None else None,
+                "similarity": (
+                    float(r["similarity"]) if r["similarity"] is not None else None
+                ),
             }
             for r in rows
         ]
 
         return {
-            "query": request.queryText,
+            "query": queryText,
             "answer": answer_text,
             "sources": sources,
         }
     except Exception as exception:
         raise HTTPException(status_code=500, detail=str(exception))
+
+
+@app.post("/answer")
+async def answer(request: AnswerRequest):
+    """
+    Retrieval + rerank + generation endpoint.
+    1) Embed query
+    2) Retrieve top-k chunks from pgvector
+    3) Generate answer grounded in retrieved context
+    """
+    base_answer = await generate_answer(
+        request.queryText, request.top_k, request.max_context_chars
+    )
+    return base_answer
+
+
+@app.post("/incident-answer")
+async def incident_answer(request: AnswerRequest):
+    """
+    Retrieval + rerank + generation endpoint + enrich answer.
+    1) Embed query
+    2) Retrieve top-k chunks from pgvector
+    3) Generate answer grounded in retrieved context
+    4) Enrich answer with confidence score and recommended actions
+    """
+    base_answer = await generate_answer(
+        request.queryText, request.top_k, request.max_context_chars
+    )
+    enriched_answer = enrich_answer(
+        base_answer["query"], base_answer["answer"], base_answer["sources"]
+    )
+    return enriched_answer
