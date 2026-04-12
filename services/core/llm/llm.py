@@ -83,7 +83,7 @@ def _generate_ollama_answer(
     return (message.get("content") or "").strip()
 
 
-def generate_answer(
+def generate_llm_answer(
     question: str,
     context_chunks: Iterable[str],
     max_tokens: int = 512,

@@ -10,9 +10,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Database
-DATABASE_URL = os.getenv(
-    "DATABASE_URL", "postgresql://rag_user:rag_pass@localhost:5432/rag_db"
-)
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    raise ValueError("DATABASE_URL is not set in the environment or .env file")
 
 # Redis
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")

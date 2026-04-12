@@ -32,7 +32,7 @@ def test_query(query_text, top_k=3):
 
         for i, hit in enumerate(hits, 1):
             print(f"{i}. {hit['title']}")
-            print(f"   Distance: {hit['distance']:.4f}")
+            print(f"   Similarity: {hit['similarity']:.4f}")
             print()
 
     except requests.exceptions.ConnectionError:
